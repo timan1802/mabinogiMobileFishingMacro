@@ -1,71 +1,91 @@
 import cv2
 import numpy as np
-import os
 from mss import mss
-from PIL import Image
+import os
 
-# 탐지에 사용할 이미지 템플릿 경로 정의
-# key: region.txt에 저장될 이름, value: 매칭 기준 이미지 경로
-TEMPLATE_PATHS = {
-    "state_icon": "img/done_clean_center.png",   # 낚시 완료 상태를 나타내는 아이콘
-    "start_icon": "img/start.png",               # 낚시 시작 아이콘
-    "fishing_icon": "img/fishing.png",           # 낚시 중 아이콘
-    "progress_bar": "img/bar.png"                # 진행 바 이미지
-}
+def find_template_multiscale(template_path, threshold=0.8, scales=None):
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(f"템플릿 이미지가 존재하지 않습니다: {template_path}")
 
-# 이미지 파일을 불러오는 함수
-def load_image(path):
-    if not os.path.exists(path):
-        print(f"[경고] 이미지 없음: {path}")
-        return None
-    return cv2.imread(path)
+    original_template = cv2.imread(template_path)
+    if original_template is None:
+        raise ValueError(f"이미지를 불러오지 못했습니다: {template_path}")
 
-# 모든 모니터에서 특정 템플릿 이미지가 화면에 있는지 찾는 함수
-# → 이미지가 발견되면 그 위치의 좌표 (left, top, width, height)를 반환
-def find_template_on_all_monitors(template, label):
+    if scales is None:
+        scales = np.linspace(0.6, 1.4, 16)
+
     with mss() as sct:
-        # sct.monitors[1:] → [1]번부터 모든 모니터 (듀얼 모니터 포함)
-        for monitor in sct.monitors[1:]:
-            sct_img = sct.grab(monitor)  # 현재 모니터 영역 캡처
-            screen = np.array(sct_img)
-            screen = cv2.cvtColor(screen, cv2.COLOR_BGRA2BGR)  # BGRA → BGR 변환
+        for idx, monitor in enumerate(sct.monitors[1:]):  # 실제 모니터들만 검사
+            print(f"[INFO] 모니터 {idx + 1} 검사 중: {monitor}")
+            screenshot = np.array(sct.grab(monitor))
+            screenshot_bgr = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
 
-            # 템플릿 매칭 수행
-            result = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
-            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+            for scale in scales:
+                resized_template = cv2.resize(original_template, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+                th, tw = resized_template.shape[:2]
 
-            # 일정 임계값 이상일 경우 일치로 판단
-            if max_val > 0.8:
-                x, y = max_loc
-                w, h = template.shape[1], template.shape[0]
-                region = (monitor["left"] + x, monitor["top"] + y, w, h)
-                print(f"[성공] {label} → 좌표: {region} (유사도: {max_val:.2f})")
-                return region
+                if screenshot_bgr.shape[0] < th or screenshot_bgr.shape[1] < tw:
+                    continue
 
-    print(f"[실패] {label} 이미지를 찾지 못함")
+                result = cv2.matchTemplate(screenshot_bgr, resized_template, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+                if max_val >= threshold:
+                    print(f"[✓] 매칭됨! 스케일: {scale:.2f}, 유사도: {max_val:.3f}")
+                    abs_left = monitor["left"] + max_loc[0]
+                    abs_top = monitor["top"] + max_loc[1]
+
+                    # ✅ 매칭된 부분만 잘라서 표시
+                    matched_crop = screenshot_bgr[max_loc[1]:max_loc[1]+th, max_loc[0]:max_loc[0]+tw]
+                    cv2.imshow(f"Matched: {os.path.basename(template_path)}", matched_crop)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
+
+                    return abs_left, abs_top, tw, th
+
+            print(f"[X] 모니터 {idx + 1}에서 미발견")
+
+    print(f"[!] 모든 모니터에서 이미지 미발견: {template_path}")
     return None
 
-# 전체 좌표 자동 설정 및 region.txt 저장 함수
-def auto_setup_regions():
-    region_map = {}
 
-    # 각 템플릿 이미지에 대해 화면에서 탐색 수행
-    for label, path in TEMPLATE_PATHS.items():
-        template = load_image(path)
-        if template is not None:
-            region = find_template_on_all_monitors(template, label)
-            if region:
-                region_map[label] = region
+def save_region(region_key, region_value):
+    path = "region.txt"
+    regions = {}
 
-    # 유효한 좌표가 존재할 경우 region.txt 파일로 저장
-    if region_map:
-        with open("region.txt", "w", encoding="utf-8") as f:
-            for key, val in region_map.items():
-                f.write(f"{key}={','.join(map(str, val))}\n")
-        print("[완료] region.txt 저장 완료")
-    else:
-        print("[오류] 저장할 좌표가 없습니다.")
+    # 기존 region.txt 로드
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=")
+                    regions[key] = val
 
-# 메인 실행 지점
+    # 새 region 저장 또는 덮어쓰기
+    regions[region_key] = ",".join(map(str, region_value))
+
+    with open(path, "w", encoding="utf-8") as f:
+        for k, v in regions.items():
+            f.write(f"{k}={v}\n")
+
+
+def batch_register_images(img_info_dict):
+    for key, path in img_info_dict.items():
+        print(f"\n[🔍] '{key}' 이미지 찾는 중... ({path})")
+        result = find_template_multiscale(path)
+        if result:
+            save_region(key, result)
+            print(f"[✔] region.txt에 저장됨 → {key}: {result}")
+        else:
+            print(f"[⚠] '{key}' 이미지 찾지 못함")
+
 if __name__ == "__main__":
-    auto_setup_regions()
+    # 등록할 이미지와 키 목록
+    image_list = {
+        "start": "img/start.png",
+        "done": "img/done.png",
+        "fishing": "img/fishing.png"
+        # 필요한 경우 여기에 더 추가 가능
+    }
+
+    batch_register_images(image_list)
