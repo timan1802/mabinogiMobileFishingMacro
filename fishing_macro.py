@@ -68,7 +68,7 @@ def capture_screen(region):
         return img
 
 # 프로그레스 바 판단 함수
-def analyze_progress_bar(screenshot, threshold_ratio=0.7):
+def analyze_progress_bar(screenshot, threshold_ratio=0.69):
     gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
     white_pixels = np.sum(binary == 255)
@@ -83,6 +83,7 @@ def analyze_progress_bar(screenshot, threshold_ratio=0.7):
 # 메인 루프 함수
 def run_fishing_macro():
     region_map = load_region()
+    fishing_count = 0  # 낚시 카운트 변수 추가
     print("매크로 시작 (Ctrl + C로 종료)")
 
     while True:
@@ -96,7 +97,8 @@ def run_fishing_macro():
         #     continue
 
         if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
-            print("[상태] 낚시 가능 시작 감지 → 스페이스바 입력")
+            fishing_count += 1  # 낚시 시도 횟수 증가
+            print(f"[상태] 낚시 가능 시작 감지 (낚시 횟수: {fishing_count}) → 스페이스바 입력")
             keyboard.press_and_release("space")
             time.sleep(13.0)
             continue
