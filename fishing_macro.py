@@ -6,6 +6,7 @@ import numpy as np
 import win32con
 import win32gui
 from mss import mss
+from datetime import datetime, timedelta
 
 # 디버그 모드
 DEBUG_MODE = False
@@ -103,23 +104,42 @@ def wait_for_fishing(region_map):
     time.sleep(3.0)
 
 
+def format_elapsed_time(elapsed_seconds):
+    """경과 시간을 시:분:초 형식으로 변환"""
+    hours = int(elapsed_seconds // 3600)
+    minutes = int((elapsed_seconds % 3600) // 60)
+    seconds = int(elapsed_seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
 def run_fishing_macro():
     region_map = load_region()
     fishing_count = 0
-    print("매크로 시작❗ (Ctrl + C로 종료)")
+    start_time = datetime.now()
+    print(f"매크로 시작 시간: {start_time.strftime('%Y-%m-%d %H:%M:%S')} (Ctrl + C로 종료)")
 
     while True:
         screen_img = capture_screen(region_map["state_icon"])
+
         if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
             fishing_count += 1
-            print(f"[상태] 낚시 가능 감지❗❗ (낚시 횟수: {fishing_count}) → 스페이스바 입력")
-            keyboard.press_and_release("space")
-            time.sleep(1.0)
+            current_time = datetime.now()
+            elapsed_time = (current_time - start_time).total_seconds()
+            elapsed_formatted = format_elapsed_time(elapsed_time)
 
-            wait_for_fishing(region_map)  # 낚는 중 감지 및 대기
+            status_msg = (
+                f"[상태] 낚시 가능 시작 감지\n"
+                f"=> 경과 시간: {elapsed_formatted}\n"
+                f"=> 총 낚시 횟수: {fishing_count}마리\n"
+            )
+            print(status_msg)
+            
+            keyboard.press_and_release("space")
+            wait_for_fishing(region_map)
+            sleep_with_countdown(1.0, "[대기]")
             continue
+
         keyboard.press_and_release("w")
-        time.sleep(1.0)
+        sleep_with_countdown(1.0, "[대기]")
 
 
 
@@ -152,6 +172,16 @@ def check_game_window():
     else:
         print("마비노기 모바일 창을 찾을 수 없습니다. 게임을 실행해주세요.")
         return False
+
+def sleep_with_countdown(seconds, prefix=""):
+    """
+    주어진 시간(초) 동안 카운트다운을 출력하며 대기합니다.
+    prefix: 카운트다운 메시지 앞에 붙일 문자열 (예: "[낚시 대기]")
+    """
+    for i in range(int(seconds * 10), 0, -1):
+        print(f"{prefix} {i/10:.1f}초 후", end="\r")
+        time.sleep(0.1)
+    print(" " * 50, end="\r")  # 이전 메시지 지우기
 
 if __name__ == "__main__":
     if check_game_window():
