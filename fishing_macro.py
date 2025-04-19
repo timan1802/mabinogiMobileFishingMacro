@@ -5,6 +5,10 @@ import keyboard
 import os
 from mss import mss
 
+import win32gui
+import win32con
+import os
+import sys
 
 # 디버그 모드
 DEBUG_MODE = True
@@ -112,5 +116,38 @@ def run_fishing_macro():
         keyboard.press_and_release("w")
         time.sleep(1.0)
 
+def find_mabinogi_window():
+    def callback(hwnd, window_list):
+        if win32gui.IsWindowVisible(hwnd):
+            window_title = win32gui.GetWindowText(hwnd)
+            if "마비노기 모바일" in window_title:
+                window_list.append(hwnd)
+        return True
+
+    window_list = []
+    win32gui.EnumWindows(callback, window_list)
+    return window_list[0] if window_list else None
+
+def focus_window(hwnd):
+    # 창이 최소화되어 있다면 복원
+    if win32gui.IsIconic(hwnd):
+        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+    # 창을 전면으로 가져오고 포커스 설정
+    win32gui.SetForegroundWindow(hwnd)
+
+def check_game_window():
+    window_handle = find_mabinogi_window()
+    
+    if window_handle:
+        print("마비노기 모바일 창을 찾았습니다. 창으로 포커스를 이동합니다.")
+        focus_window(window_handle)
+        return True
+    else:
+        print("마비노기 모바일 창을 찾을 수 없습니다. 게임을 실행해주세요.")
+        return False
+
 if __name__ == "__main__":
-    run_fishing_macro()
+    if check_game_window():
+        # 창을 찾았을 경우, 매크로 실행
+        time.sleep(1)  # 포커스 이동 후 잠시 대기
+        run_fishing_macro()
