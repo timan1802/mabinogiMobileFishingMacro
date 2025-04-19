@@ -1,14 +1,11 @@
-import cv2
-import numpy as np
+import os
 import time
+import cv2
 import keyboard
-import os
-from mss import mss
-
-import win32gui
+import numpy as np
 import win32con
-import os
-import sys
+import win32gui
+from mss import mss
 
 # 디버그 모드
 DEBUG_MODE = True
@@ -36,7 +33,7 @@ def load_image(path):
     return cv2.imread(path)
 
 
-def is_image_match(screenshot, template_path, threshold=0.8, debug=False):
+def is_image_match(screenshot, template_path, threshold=0.7, debug=False):
     template = load_image(template_path)
     if template is None:
         return False
