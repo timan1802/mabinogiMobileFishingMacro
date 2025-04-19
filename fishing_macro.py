@@ -8,7 +8,7 @@ import win32gui
 from mss import mss
 
 # 디버그 모드
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 # region.txt 불러오기
 def load_region():
@@ -33,7 +33,7 @@ def load_image(path):
     return cv2.imread(path)
 
 
-def is_image_match(screenshot, template_path, threshold=0.7, debug=False):
+def is_image_match(screenshot, template_path, threshold=0.8, debug=False):
     template = load_image(template_path)
     if template is None:
         return False
@@ -80,40 +80,48 @@ def analyze_progress_bar(screenshot, threshold_ratio=0.69):
         cv2.waitKey(1)
     return ratio >= threshold_ratio
 
-# 메인 루프 함수
+
+def wait_for_fishing(region_map):
+    """낚는 중 상태를 감지하고 10초 카운트다운을 수행하는 함수"""
+    while True:
+        print("[상태] 낚는 중 이미지 감지 대기중...")
+        screen_img = capture_screen(region_map["state_icon"])
+        if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
+            waiting_second = 7  # 물고기가 걸렸든, 안걸렸든 둘다 처리가능한 최상의 시간
+            print(f"[상태] 낚는 중 감지. {waiting_second}초후 스페이스바 입력.")
+            for i in range(waiting_second, 0, -1):
+                print(f"[카운트다운] {i}초 남음...")
+                time.sleep(1.0)
+            keyboard.press_and_release("space")
+            time.sleep(1.0)
+            break  # 내부 while 루프를 빠져나감
+        time.sleep(1.0)
+        continue
+
+    print("낚시 완료. 💯")
+    print("모션 대기 3초.")
+    time.sleep(3.0)
+
+
 def run_fishing_macro():
     region_map = load_region()
-    fishing_count = 0  # 낚시 카운트 변수 추가
-    print("매크로 시작 (Ctrl + C로 종료)")
+    fishing_count = 0
+    print("매크로 시작❗ (Ctrl + C로 종료)")
 
     while True:
         screen_img = capture_screen(region_map["state_icon"])
-
-        # 나침반 감지가 안됨.
-        # if is_image_match(screen_img, "img/done.png", debug=DEBUG_MODE):
-        #     print("[상태] 낚시 종료 감지 → W 키 입력")
-        #     keyboard.press_and_release("w")
-        #     time.sleep(1.0)
-        #     continue
-
         if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
-            fishing_count += 1  # 낚시 시도 횟수 증가
-            print(f"[상태] 낚시 가능 시작 감지 (낚시 횟수: {fishing_count}) → 스페이스바 입력")
+            fishing_count += 1
+            print(f"[상태] 낚시 가능 감지❗❗ (낚시 횟수: {fishing_count}) → 스페이스바 입력")
             keyboard.press_and_release("space")
-            time.sleep(13.0)
+            time.sleep(1.0)
+
+            wait_for_fishing(region_map)  # 낚는 중 감지 및 대기
             continue
-
-        # 낚시 중 감지는 되지만, progress_bar 감지가 안됨.
-        # if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
-        #     print("[상태] 낚시 중...")
-        #     bar_img = capture_screen(region_map["progress_bar"])
-        #     if analyze_progress_bar(bar_img):
-        #         print("[상태] 물고기 감지! 스페이스바 입력")
-        #         keyboard.press_and_release("space")
-        #         time.sleep(1.0)
-
         keyboard.press_and_release("w")
         time.sleep(1.0)
+
+
 
 def find_mabinogi_window():
     def callback(hwnd, window_list):
