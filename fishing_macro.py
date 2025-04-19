@@ -1,99 +1,116 @@
-import time
 import cv2
 import numpy as np
-import pyautogui
+import time
+import keyboard
+import os
 from mss import mss
 
-# region.txt 파일에서 이미지별 좌표 영역을 불러오는 함수
-def load_regions():
-    regions = {}
-    try:
-        with open("region.txt", "r", encoding="utf-8") as f:
-            for line in f:
-                if "=" in line:
-                    key, val = line.strip().split("=")
-                    regions[key] = tuple(map(int, val.split(",")))
-    except FileNotFoundError:
-        print("[!] region.txt 파일이 없습니다. setup_region.py를 먼저 실행하세요.")
-        exit()
-    return regions
 
-# 특정 영역을 캡처해서 numpy 배열로 반환
-def capture_region(region):
-    left, top, width, height = region
-    with mss() as sct:
-        monitor = {"left": left, "top": top, "width": width, "height": height}
-        screenshot = sct.grab(monitor)
-        return np.array(screenshot)
+# 디버그 모드
+DEBUG_MODE = True
 
-# 지정한 이미지 템플릿이 해당 영역 내에 존재하는지 여부를 판단
-def is_image_visible(region, template, threshold=0.9):
-    screen = capture_region(region)
+# region.txt 불러오기
+def load_region():
+    region_map = {}
+    if not os.path.exists("region.txt"):
+        raise FileNotFoundError("region.txt 파일이 존재하지 않습니다.")
+    with open("region.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                try:
+                    key, val = line.strip().split(":")
+                    region_map[key] = tuple(map(int, val.strip().split(",")))
+                except ValueError:
+                    print(f"[경고] 무시된 잘못된 줄: {line.strip()}")
+    return region_map
 
-    # 템플릿 크기 검증
-    if (template.shape[0] > screen.shape[0]) or (template.shape[1] > screen.shape[1]):
-        print(f"[!] 템플릿이 화면 영역보다 큽니다. 템플릿: {template.shape}, 화면: {screen.shape}")
+# 이미지 불러오기
+def load_image(path):
+    if not os.path.exists(path):
+        print(f"이미지 파일 없음: {path}")
+        return None
+    return cv2.imread(path)
+
+
+def is_image_match(screenshot, template_path, threshold=0.8, debug=False):
+    template = load_image(template_path)
+    if template is None:
         return False
 
-    # 채널 일치 확인 (BGR → Grayscale로 통일할 경우 추가)
-    # screen_gray = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
-    # template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-    # res = cv2.matchTemplate(screen_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+    # 이미지 전처리
+    screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+    template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    
+    # 노이즈 제거
+    screenshot_gray = cv2.GaussianBlur(screenshot_gray, (3,3), 0)
+    template_gray = cv2.GaussianBlur(template_gray, (3,3), 0)
+    
+    # 히스토그램 평활화
+    screenshot_gray = cv2.equalizeHist(screenshot_gray)
+    template_gray = cv2.equalizeHist(template_gray)
 
-    res = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
-    _, max_val, _, _ = cv2.minMaxLoc(res)
+    result = cv2.matchTemplate(screenshot_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+    if debug:
+        print(f"매칭 점수: {max_val:.3f} (임계값: {threshold})")
+
     return max_val >= threshold
 
-# 메인 매크로 함수
-def main():
-    print("[시작] region.txt 불러오는 중...")
-    regions = load_regions()
+# 화면 캡처 함수 (mss 사용)
+def capture_screen(region):
+    with mss() as sct:
+        monitor = {"top": region[1], "left": region[0], "width": region[2], "height": region[3]}
+        sct_img = sct.grab(monitor)
+        img = np.array(sct_img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+        return img
 
-    # 필요한 영역들이 모두 있는지 확인
-    if not all(k in regions for k in ("start", "fishing")):
-        print("[!] region.txt에 'start' 또는 'fishing' 영역 정보가 없습니다.")
-        return
+# 프로그레스 바 판단 함수
+def analyze_progress_bar(screenshot, threshold_ratio=0.7):
+    gray = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
+    white_pixels = np.sum(binary == 255)
+    total_pixels = binary.shape[0] * binary.shape[1]
+    ratio = white_pixels / total_pixels
+    if DEBUG_MODE:
+        print(f"Progress Ratio: {ratio:.2f}")
+        cv2.imshow("Progress Bar", binary)
+        cv2.waitKey(1)
+    return ratio >= threshold_ratio
 
-    # 이미지 템플릿 불러오기
-    print("[✓] start.png, fishing.png 불러오는 중...")
-    start_template = cv2.imread("img/start.png", cv2.IMREAD_COLOR)
-    fishing_template = cv2.imread("img/fishing.png", cv2.IMREAD_COLOR)
+# 메인 루프 함수
+def run_fishing_macro():
+    region_map = load_region()
+    print("매크로 시작 (Ctrl + C로 종료)")
 
-    if start_template is None or fishing_template is None:
-        print("[!] start.png 또는 fishing.png 파일이 없습니다.")
-        return
+    while True:
+        screen_img = capture_screen(region_map["state_icon"])
 
-    start_region = regions["start"]
-    fishing_region = regions["fishing"]
+        # 나침반 감지가 안됨.
+        # if is_image_match(screen_img, "img/done.png", debug=DEBUG_MODE):
+        #     print("[상태] 낚시 종료 감지 → W 키 입력")
+        #     keyboard.press_and_release("w")
+        #     time.sleep(1.0)
+        #     continue
 
-    print("[▶] 낚시 매크로 시작합니다. Ctrl+C로 종료하세요.")
-    try:
-        while True:
-            is_start = is_image_visible(start_region, start_template)
-            is_fishing = is_image_visible(fishing_region, fishing_template)
+        if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
+            print("[상태] 낚시 가능 시작 감지 → 스페이스바 입력")
+            keyboard.press_and_release("space")
+            time.sleep(13.0)
+            continue
 
-            if is_start:
-                # 낚시 준비 완료 상태 → 시작 버튼 클릭
-                print("[🎯] 낚시 준비 완료 → 시작 버튼 클릭")
-                x, y, _, _ = start_region
-                pyautogui.moveTo(x + 5, y + 5)
-                pyautogui.click()
-                time.sleep(1)
+        # 낚시 중 감지는 되지만, progress_bar 감지가 안됨.
+        # if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
+        #     print("[상태] 낚시 중...")
+        #     bar_img = capture_screen(region_map["progress_bar"])
+        #     if analyze_progress_bar(bar_img):
+        #         print("[상태] 물고기 감지! 스페이스바 입력")
+        #         keyboard.press_and_release("space")
+        #         time.sleep(1.0)
 
-            elif is_fishing:
-                # 낚시 중 상태 → 일정 시간 대기
-                print("[🎣] 낚시 진행 중... 대기 중")
-                time.sleep(1)
+        keyboard.press_and_release("w")
+        time.sleep(1.0)
 
-            else:
-                # 둘 다 안 보이면 → 낚시 성공 또는 실패 → SPACE 입력
-                print("[✓] 낚시 완료 추정 → SPACE 입력")
-                pyautogui.press("space")
-                time.sleep(3)  # 결과 처리 대기 후 다음 루프
-
-    except KeyboardInterrupt:
-        print("\n[종료] 사용자에 의해 종료됨")
-
-# 프로그램 시작
 if __name__ == "__main__":
-    main()
+    run_fishing_macro()
