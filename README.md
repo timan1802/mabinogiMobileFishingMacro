@@ -16,15 +16,16 @@
 git clone https://github.com/yourname/mabinogiMobileFishingMacro.git
 cd mabinogiMobileFishingMacro
 pip install -r requirements.txt
+
+exe 파일 생성
+pyinstaller --onefile --icon=NONE fishing_macro.py
+
+옵션 설명:
+- `--onefile`: 모든 종속성을 포함한 단일 실행 파일 생성
+- `--noconsole`: 콘솔 창 없이 실행 (GUI 앱의 경우)
+- `--icon=NONE`: 기본 아이콘 사용
+
 ```
-
-> 필요한 기본 라이브러리:
-> - `opencv-python`
-> - `numpy`
-> - `pyautogui`
-> - `mss`
-> - `Pillow`
-
 ---
 
 ## 📂 폴더 구조
