@@ -83,9 +83,19 @@ def analyze_progress_bar(screenshot, threshold_ratio=0.69):
 
 
 def wait_for_fishing(region_map):
-    """낚는 중 상태를 감지하고 10초 카운트다운을 수행하는 함수"""
+    """낚는 중 상태를 감지하고 대기하는 함수"""
+    start_time = time.time()
+    timeout = 60  # 1분 타임아웃
+
     while True:
         print("[상태] 낚는 중 이미지 감지 대기중...")
+        
+        # 1분 초과 체크
+        current_time = time.time()
+        if current_time - start_time > timeout:
+            print("[경고] 1분 이상 대기하여 루프를 종료합니다.")
+            return
+            
         screen_img = capture_screen(region_map["state_icon"])
         if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
             waiting_second = 7  # 물고기가 걸렸든, 안걸렸든 둘다 처리가능한 최상의 시간
@@ -97,7 +107,6 @@ def wait_for_fishing(region_map):
             time.sleep(1.0)
             break  # 내부 while 루프를 빠져나감
         time.sleep(1.0)
-        continue
 
     print("낚시 완료. 💯")
     print("모션 대기 3초.")
