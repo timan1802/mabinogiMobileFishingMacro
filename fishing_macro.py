@@ -9,7 +9,8 @@ from mss import mss
 from datetime import datetime, timedelta
 
 # 디버그 모드
-DEBUG_MODE = False
+DEBUG_MODE = True
+THRESHOLD = 0.75
 
 # region.txt 불러오기
 def load_region():
@@ -97,7 +98,7 @@ def wait_for_fishing(region_map):
             return
             
         screen_img = capture_screen(region_map["state_icon"])
-        if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
+        if is_image_match(screen_img, "img/fishing.png", threshold=THRESHOLD, debug=DEBUG_MODE):
             waiting_second = 7  # 물고기가 걸렸든, 안걸렸든 둘다 처리가능한 최상의 시간
             print(f"[상태] 낚는 중 감지. {waiting_second}초후 스페이스바 입력.")
             for i in range(waiting_second, 0, -1):
@@ -127,9 +128,10 @@ def run_fishing_macro():
     print(f"매크로 시작 시간: {start_time.strftime('%Y-%m-%d %H:%M:%S')} (Ctrl + C로 종료)")
 
     while True:
+        print("낚시 가능 이미지 찾는 중...")
         screen_img = capture_screen(region_map["state_icon"])
 
-        if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
+        if is_image_match(screen_img, "img/start.png", threshold=THRESHOLD, debug=DEBUG_MODE):
             fishing_count += 1
             current_time = datetime.now()
             elapsed_time = (current_time - start_time).total_seconds()
@@ -165,11 +167,38 @@ def find_mabinogi_window():
     return window_list[0] if window_list else None
 
 def focus_window(hwnd):
-    # 창이 최소화되어 있다면 복원
-    if win32gui.IsIconic(hwnd):
-        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-    # 창을 전면으로 가져오고 포커스 설정
-    win32gui.SetForegroundWindow(hwnd)
+    try:
+        # 현재 포그라운드 윈도우 핸들 가져오기wwwwwww
+        current_hwnd = win32gui.GetForegroundWindow()
+        
+        # 현재 포그라운드 윈도우의 스레드 ID 가져오기
+        current_thread = win32gui.GetWindowThreadProcessId(current_hwnd)[0]
+        
+        # 대상 윈도우의 스레드 ID 가져오기
+        target_thread = win32gui.GetWindowThreadProcessId(hwnd)[0]
+        
+        # 스레드 입력 상태를 연결
+        win32gui.AttachThreadInput(target_thread, current_thread, True)
+        
+        # 창이 최소화되어 있다면 복원
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            
+        # 창을 전면으로 가져오기
+        win32gui.SetForegroundWindow(hwnd)
+        win32gui.BringWindowToTop(hwnd)
+        
+        # 스레드 입력 상태 연결 해제
+        win32gui.AttachThreadInput(target_thread, current_thread, False)
+        
+        # 잠시 대기하여 창 전환이 완료되도록 함
+        time.sleep(0.5)
+        
+    except Exception as e:
+        print(f"창 포커스 전환 중 오류 발생: {str(e)}")
+        return False
+        
+    return True
 
 def check_game_window():
     window_handle = find_mabinogi_window()
@@ -183,14 +212,10 @@ def check_game_window():
         return False
 
 def sleep_with_countdown(seconds, prefix=""):
-    """
-    주어진 시간(초) 동안 카운트다운을 출력하며 대기합니다.
-    prefix: 카운트다운 메시지 앞에 붙일 문자열 (예: "[낚시 대기]")
-    """
-    for i in range(int(seconds * 10), 0, -1):
-        print(f"{prefix} {i/10:.1f}초 후", end="\r")
-        time.sleep(0.1)
-    print(" " * 50, end="\r")  # 이전 메시지 지우기
+    for i in range(int(seconds), 0, -1):
+        print(f"{prefix} {i}초 후")  # \r 제거, 매 초마다 새 줄에 출력
+        time.sleep(1)
+    print(" " * 50)
 
 if __name__ == "__main__":
     if check_game_window():

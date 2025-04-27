@@ -58,8 +58,10 @@ def is_image_match(screenshot, template_path, threshold=0.7, debug=False):
         print(f"템플릿 크기: {template_w}x{template_h}")
 
         # 스크린샷과 템플릿 이미지 저장
-        cv2.imwrite("debug_screenshot.png", screenshot)
-        cv2.imwrite("debug_template.png", template)
+        # cv2.imwrite("debug_screenshot.png", screenshot)
+        cv2.imwrite("debug_screenshot_gray.png", screenshot_gray)
+        # cv2.imwrite("debug_template.png", template)
+        cv2.imwrite("debug_template_gray.png", template_gray)
 
     if template_h > screenshot_h or template_w > screenshot_w:
         if debug:
@@ -118,31 +120,22 @@ def analyze_progress_bar(screenshot, threshold_ratio=0.7):
     return ratio >= threshold_ratio
 
 # 메인 루프 함수
-def run_fishing_macro():
+def find_img(template_img):
     region_map = load_region()
-    print("매크로 시작 (Ctrl + C로 종료)")
 
     while True:
         screen_img = capture_screen(region_map["state_icon"])
 
-        if is_image_match(screen_img, "img/done.png", debug=DEBUG_MODE):
-            print("낚시 종료 찾음")
-            break
+        if is_image_match(screen_img, template_img, debug=DEBUG_MODE):
+            print("💚이미지 찾음")
+            # break
 
-        if is_image_match(screen_img, "img/start.png", debug=DEBUG_MODE):
-            print("낚시 시작 찾음")
-            break
-
-        if is_image_match(screen_img, "img/fishing.png", debug=DEBUG_MODE):
-            print("낚시 중 찾음")
-            break
-
-        bar_img = capture_screen(region_map["progress_bar"])
-        if analyze_progress_bar(bar_img):
-            print("progress_bar 감지!")
-            break
 
         time.sleep(1)
 
 if __name__ == "__main__":
-    run_fishing_macro()
+    template_img = "img/start.png"
+    # template_img = "img/done.png"
+    # template_img = "img/done.png"
+
+    find_img(template_img)
