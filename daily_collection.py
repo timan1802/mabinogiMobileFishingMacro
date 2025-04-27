@@ -13,13 +13,17 @@ def save_coordinates():
     coordinates_data = {
         "생활_스킬": None,
         "채집_카테고리": None,
-        "need_scroll": None,
         "채집물": None,
-        "가까운_위치": None
+        "가까운_위치": None,
+        "scroll_info": {
+            "count": 0,
+            "direction": None
+        }
     }
 
     global current_target
-    scroll_detected = False
+    scroll_count = 0
+    scroll_direction = None
 
     def on_click(x, y, button, pressed):
         global current_target
@@ -29,8 +33,12 @@ def save_coordinates():
             return False
 
     def on_scroll(x, y, dx, dy):
-        nonlocal scroll_detected
-        scroll_detected = True
+        nonlocal scroll_count, scroll_direction
+        scroll_count += 1
+        if scroll_direction is None:
+            scroll_direction = 'down' if dy < 0 else 'up'
+        coordinates_data["scroll_info"]["count"] = scroll_count
+        coordinates_data["scroll_info"]["direction"] = scroll_direction
 
     print('좌표를 입력받아 저장을 시작합니다.')
     print("마비노기 화면으로 이동후 c 키를 눌러주세요...")
@@ -42,18 +50,17 @@ def save_coordinates():
         with mouse.Listener(on_click=on_click) as listener:
             listener.join()
 
-    print("\n채집물 위치를 클릭해주세요. 스크롤를 기억합니다.")
+    print("\n채집물 위치를 클릭해주세요. 스크롤이 필요한 경우 스크롤을 해주세요.")
     current_target = "채집물"
     with mouse.Listener(on_click=on_click, on_scroll=on_scroll) as listener:
         listener.join()
-
-    coordinates_data["need_scroll"] = scroll_detected
 
     print("\n가까운 위치를 클릭해주세요.")
     current_target = "가까운_위치"
     with mouse.Listener(on_click=on_click) as listener:
         listener.join()
 
+    # 나머지 저장 로직은 동일...
     # 좌표 세트의 이름 입력받기
     print("\n이 좌표 세트의 이름을 입력해주세요 (예: 루아브릿지, 티르코네일 등):")
     set_name = input().strip()
@@ -187,27 +194,18 @@ def perform_click(mouse, x, y, delay=1):
     mouse.click(Button.left)
     time.sleep(delay)
 
+def perform_scroll(mouse, scroll_info):
+    if scroll_info["count"] > 0:
+        direction_multiplier = -1 if scroll_info["direction"] == "down" else 1
+        for _ in range(scroll_info["count"]):
+            mouse.scroll(0, direction_multiplier)
+            time.sleep(0.1)
+        time.sleep(0.5)
 
 def run_macro():
-    # 좌표 데이터 로드
     coords = load_coordinates()
     if not coords:
         return
-
-    # 게임 창 찾기 및 포커스 이동
-    # TODO module 'win32gui' has no attribute 'GetWindowThreadProcessId' 오류 발생. 수정 필요
-    # window_handle = find_mabinogi_window()
-    # if window_handle:
-    #     print("마비노기 모바일 창을 찾았습니다. 창으로 포커스를 이동합니다.")
-    #     if focus_window(window_handle):
-    #         # 포커스 이동 성공 후 1초 대기
-    #         time.sleep(1)
-    #     else:
-    #         print("창 포커스 이동 실패")
-    #         return
-    # else:
-    #     print("마비노기 모바일 창을 찾을 수 없습니다.")
-    #     return
 
     mouse = Controller()
     print("매크로가 시작되었습니다. 'q' 키를 누르면 종료됩니다.")
@@ -224,17 +222,11 @@ def run_macro():
             # 일상 채집 클릭
             perform_click(mouse, *coords["채집_카테고리"])
 
-            # 스크롤이 필요한 경우 처리
-            if coords["need_scroll"]:
+            # 스크롤 정보가 있으면 실행
+            if coords.get("scroll_info") and coords["scroll_info"]["count"] > 0:
                 mouse.position = coords["채집물"]
                 time.sleep(0.5)
-
-                # 스크롤 수행
-                for _ in range(6):
-                    mouse.scroll(0, -1)  # 항상 아래로 스크롤
-                    time.sleep(0.1)  # 각 스크롤 사이에 약간의 딜레이
-
-                time.sleep(0.5)
+                perform_scroll(mouse, coords["scroll_info"])
 
             # 채집물 클릭
             perform_click(mouse, *coords["채집물"])
@@ -242,7 +234,7 @@ def run_macro():
             # 가까운 위치 클릭
             perform_click(mouse, *coords["가까운_위치"])
 
-            # 대기 시간 설정
+            # 대기 시간...
             print(f"{WAIT_SECONDS}초 대기 중...")
             for i in range(WAIT_SECONDS, 0, -1):
                 if keyboard.is_pressed('q'):
