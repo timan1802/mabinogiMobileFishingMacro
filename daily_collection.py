@@ -78,6 +78,25 @@ def save_coordinates():
         print(f"{key.replace('_', ' ')}: {value}")
 
 
+def get_numeric_keyboard_input():
+    """숫자 키만 입력 받는 함수"""
+    while True:
+        # 이전 입력 버퍼 비우기
+        import msvcrt
+        while msvcrt.kbhit():
+            msvcrt.getch()
+
+        print("\n사용할 좌표 세트 번호를 선택해주세요 (종료: q):")
+        event = keyboard.read_event(suppress=True)
+
+        if event.event_type == 'down':
+            if event.name == 'q':
+                return 'q'
+            if event.name.isdigit():
+                return event.name
+            else:
+                print("숫자만 입력해주세요")
+
 def load_coordinates():
     try:
         with open('daily_collection_regions.json', 'r', encoding='utf-8') as f:
@@ -92,30 +111,20 @@ def load_coordinates():
                 print(f"{idx}. {name}")
 
             while True:
-                print("\n사용할 좌표 세트 번호를 선택해주세요 (종료: q):")
-                user_input = input().strip()
-                
-                # 종료 조건 검사
-                if user_input.lower() == 'q':
+                user_input = get_numeric_keyboard_input()
+
+                if user_input == 'q':
                     print("프로그램을 종료합니다.")
                     return None
-                
-                # 입력값에서 숫자만 추출
-                numbers_only = ''.join(filter(str.isdigit, user_input))
-                print(f"입력값에서 추출된 숫자: {numbers_only}")
-                
-                # 숫자 변환 및 검증
+
                 try:
-                    if numbers_only:
-                        choice = int(numbers_only)
-                        if 1 <= choice <= len(coord_list):
-                            selected_name = coord_list[choice-1]
-                            print(f"선택된 좌표 세트: '{selected_name}'")
-                            return all_coordinates[selected_name]
-                        else:
-                            print(f"유효한 번호를 입력해주세요 (1-{len(coord_list)})")
+                    choice = int(user_input)
+                    if 1 <= choice <= len(coord_list):
+                        selected_name = coord_list[choice-1]
+                        print(f"선택된 좌표 세트: '{selected_name}'")
+                        return all_coordinates[selected_name]
                     else:
-                        print("숫자를 입력해주세요")
+                        print(f"유효한 번호를 입력해주세요 (1-{len(coord_list)})")
                 except ValueError:
                     print(f"올바른 숫자를 입력해주세요 (1-{len(coord_list)})")
 
@@ -142,34 +151,34 @@ def focus_window(hwnd):
     try:
         # 현재 포그라운드 윈도우 핸들 가져오기
         current_hwnd = win32gui.GetForegroundWindow()
-        
+
         # 현재 포그라운드 윈도우의 스레드 ID 가져오기
         current_thread = win32gui.GetWindowThreadProcessId(current_hwnd)[0]
-        
+
         # 대상 윈도우의 스레드 ID 가져오기
         target_thread = win32gui.GetWindowThreadProcessId(hwnd)[0]
-        
+
         # 스레드 입력 상태를 연결
         win32gui.AttachThreadInput(target_thread, current_thread, True)
-        
+
         # 창이 최소화되어 있다면 복원
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            
+
         # 창을 전면으로 가져오기
         win32gui.SetForegroundWindow(hwnd)
         win32gui.BringWindowToTop(hwnd)
-        
+
         # 스레드 입력 상태 연결 해제
         win32gui.AttachThreadInput(target_thread, current_thread, False)
-        
+
         # 잠시 대기하여 창 전환이 완료되도록 함
         time.sleep(0.5)
-        
+
     except Exception as e:
         print(f"창 포커스 전환 중 오류 발생: {str(e)}")
         return False
-        
+
     return True
 
 def perform_click(mouse, x, y, delay=1):
@@ -203,12 +212,12 @@ def run_macro():
     mouse = Controller()
     print("매크로가 시작되었습니다. 'q' 키를 누르면 종료됩니다.")
     sleep_with_countdown(5, "마비노기 모바일 창으로 이동하세요.")
-    
+
     try:
         while not keyboard.is_pressed('q'):
             print("캐릭터 화면으로 이동합니다.")
             keyboard.press_and_release("c")
-            
+
             # 생활 스킬 클릭
             perform_click(mouse, *coords["생활_스킬"])
 
@@ -254,15 +263,47 @@ def sleep_with_countdown(seconds, prefix=""):
         time.sleep(1)
     print(" " * 50)
 
+def run_macro_with_clean_input():
+    # 키보드 버퍼 초기화
+    def clear_keyboard_buffer():
+        import msvcrt
+        while msvcrt.kbhit():
+            msvcrt.getch()
+    
+    # print("매크로를 시작하려면 '2' 키를 누르세요...")
+    # keyboard.wait('2')
+    
+    # 키보드 버퍼 비우기
+    clear_keyboard_buffer()
+    
+    # stdin 버퍼 비우기
+    import sys
+    sys.stdin.flush()
+    
+    # 매크로 실행
+    run_macro()
+
+def get_numeric_key_input():
+    """숫자 키만 입력 받는 함수"""
+    while True:
+        event = keyboard.read_event(suppress=True)
+        if event.event_type == 'down':  # 키가 눌렸을 때만 처리
+            if event.name.isdigit():  # 숫자 키인지 확인
+                return event.name
+            else:
+                print("숫자만 입력해주세요 (1 또는 2)")
+
 if __name__ == "__main__":
     print("다음 중 선택해주세요:")
     print("1. 새로운 좌표 저장")
-    print("2. 매크로 실행 (다른 아무 키나 누르세요)")
-
-    if keyboard.read_event(suppress=True).name == '1':
+    print("2. 매크로 실행")
+    
+    key = get_numeric_key_input()
+    
+    if key == '1':
         save_coordinates()
         print("\n좌표 저장이 완료되었습니다. 매크로를 실행하려면 프로그램을 다시 실행해주세요.")
+    elif key == '2':
+        run_macro_with_clean_input()
     else:
-        print("매크로를 시작하려면 '2' 키를 누르세요...")
-        keyboard.wait('2')
-        run_macro()
+        print("잘못된 입력입니다.")
