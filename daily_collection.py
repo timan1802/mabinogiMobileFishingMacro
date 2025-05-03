@@ -296,15 +296,37 @@ def show_coordinates():
             print("\n저장된 좌표 세트:")
             coord_list = list(all_coordinates.keys())
             for idx, name in enumerate(coord_list, 1):
-                print(f"\n{idx}. {name}")
-                coords = all_coordinates[name]
-                print("  ├ 생활 스킬:", coords["생활_스킬"])
-                print("  ├ 채집 카테고리:", coords["채집_카테고리"])
-                print("  ├ 채집물:", coords["채집물"])
-                print("  ├ 가까운 위치:", coords["가까운_위치"])
-                print("  └ 스크롤 정보:")
-                print(f"     ├ 횟수: {coords['scroll_info']['count']}")
-                print(f"     └ 방향: {coords['scroll_info']['direction']}")
+                print(f"{idx}. {name}")
+
+            print("\n상세 정보를 보려면 좌표 세트 번호를 입력하세요 (종료: q):")
+            while True:
+                user_input = get_numeric_keyboard_input()
+                
+                if user_input == 'q':
+                    print("좌표 보기를 종료합니다.")
+                    break
+
+                try:
+                    choice = int(user_input)
+                    if 1 <= choice <= len(coord_list):
+                        selected_name = coord_list[choice-1]
+                        coords = all_coordinates[selected_name]
+                        
+                        print(f"\n[{selected_name}] 좌표 세트 상세 정보:")
+                        print("┌───────────────────────────────────")
+                        print(f"├ 생활 스킬: {coords['생활_스킬']}")
+                        print(f"├ 채집 카테고리: {coords['채집_카테고리']}")
+                        print(f"├ 채집물: {coords['채집물']}")
+                        print(f"├ 가까운 위치: {coords['가까운_위치']}")
+                        print("├ 스크롤 정보:")
+                        print(f"│  ├ 횟수: {coords['scroll_info']['count']}")
+                        print(f"│  └ 방향: {coords['scroll_info']['direction']}")
+                        print("└───────────────────────────────────")
+                        print("\n다른 좌표 세트를 보려면 번호를 입력하세요 (종료: q):")
+                    else:
+                        print(f"유효한 번호를 입력해주세요 (1-{len(coord_list)})")
+                except ValueError:
+                    print(f"올바른 숫자를 입력해주세요 (1-{len(coord_list)})")
 
     except FileNotFoundError:
         print("좌표 정보 파일을 찾을 수 없습니다.")
