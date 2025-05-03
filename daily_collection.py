@@ -7,7 +7,7 @@ import win32gui
 from pynput import mouse
 from pynput.mouse import Button, Controller
 
-WAIT_SECONDS = 50
+WAIT_SECONDS = 30
 
 def save_coordinates():
     coordinates_data = {
@@ -285,10 +285,37 @@ def get_numeric_key_input():
             else:
                 print("숫자만 입력해주세요 (1 또는 2)")
 
+def show_coordinates():
+    try:
+        with open('daily_collection_regions.json', 'r', encoding='utf-8') as f:
+            all_coordinates = json.load(f)
+            if not all_coordinates:
+                print("저장된 좌표 세트가 없습니다.")
+                return
+
+            print("\n저장된 좌표 세트:")
+            coord_list = list(all_coordinates.keys())
+            for idx, name in enumerate(coord_list, 1):
+                print(f"\n{idx}. {name}")
+                coords = all_coordinates[name]
+                print("  ├ 생활 스킬:", coords["생활_스킬"])
+                print("  ├ 채집 카테고리:", coords["채집_카테고리"])
+                print("  ├ 채집물:", coords["채집물"])
+                print("  ├ 가까운 위치:", coords["가까운_위치"])
+                print("  └ 스크롤 정보:")
+                print(f"     ├ 횟수: {coords['scroll_info']['count']}")
+                print(f"     └ 방향: {coords['scroll_info']['direction']}")
+
+    except FileNotFoundError:
+        print("좌표 정보 파일을 찾을 수 없습니다.")
+    except Exception as e:
+        print(f"오류가 발생했습니다: {str(e)}")
+
 if __name__ == "__main__":
     print("다음 중 선택해주세요:")
     print("1. 새로운 좌표 저장")
     print("2. 매크로 실행")
+    print("3. 저장된 좌표 보기")
     
     key = get_numeric_key_input()
     
@@ -297,5 +324,7 @@ if __name__ == "__main__":
         print("\n좌표 저장이 완료되었습니다. 매크로를 실행하려면 프로그램을 다시 실행해주세요.")
     elif key == '2':
         run_macro_with_clean_input()
+    elif key == '3':
+        show_coordinates()
     else:
         print("잘못된 입력입니다.")
