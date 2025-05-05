@@ -22,7 +22,7 @@ pyinstaller --onefile --icon=NONE fishing_macro.py
 
 옵션 설명:
 - `--onefile`: 모든 종속성을 포함한 단일 실행 파일 생성
-- `--noconsole`: 콘솔 창 없이 실행 (GUI 앱의 경우)
+- `--noconsole`: 콘솔 창 없이 실행
 - `--icon=NONE`: 기본 아이콘 사용
 
 ```
@@ -34,6 +34,7 @@ pyinstaller --onefile --icon=NONE fishing_macro.py
 mabinogiMobileFishingMacro/
 ├── img/                   # 상태 이미지 모음 (start.png, done.png, fishing.png 등)
 ├── setup_region.py        # 자동 좌표 설정용 스크립트
+├── daily_collection.py    # 자동 채집 매크로, 낚시 아님.
 ├── fishing_macro.py       # 매크로 실행 파일
 ├── test_find_img.py       # 이미지 탐색 테스트용 스크립트
 ├── region.txt             # 낚시 영역 좌표 저장 파일
