@@ -7,7 +7,7 @@ import win32gui
 from pynput import mouse
 from pynput.mouse import Button, Controller
 
-WAIT_SECONDS = 30
+WAIT_SECONDS = 60
 
 def save_coordinates():
     coordinates_data = {
@@ -86,23 +86,24 @@ def save_coordinates():
 
 
 def get_numeric_keyboard_input():
-    """숫자 키만 입력 받는 함수"""
+    """숫자 키를 누적해서 입력 받는 함수"""
+    input_buffer = ""
+    print("\n사용할 좌표 세트 번호를 선택해주세요 (종료: q, 확인: Enter):")
+    
     while True:
-        # 이전 입력 버퍼 비우기
-        import msvcrt
-        while msvcrt.kbhit():
-            msvcrt.getch()
-
-        print("\n사용할 좌표 세트 번호를 선택해주세요 (종료: q):")
         event = keyboard.read_event(suppress=True)
-
         if event.event_type == 'down':
             if event.name == 'q':
                 return 'q'
-            if event.name.isdigit():
-                return event.name
-            else:
-                print("숫자만 입력해주세요")
+            elif event.name == 'enter':
+                return input_buffer if input_buffer else 'q'
+            elif event.name.isdigit():
+                input_buffer += event.name
+                print(input_buffer, end='\r')
+            elif event.name == 'backspace' and input_buffer:
+                input_buffer = input_buffer[:-1]
+                print(" " * 20, end='\r')  # 이전 입력 지우기
+                print(input_buffer, end='\r')
 
 def load_coordinates():
     try:
